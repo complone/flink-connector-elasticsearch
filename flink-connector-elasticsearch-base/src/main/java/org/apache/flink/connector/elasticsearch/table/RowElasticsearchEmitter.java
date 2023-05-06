@@ -18,14 +18,20 @@
 
 package org.apache.flink.connector.elasticsearch.table;
 
+import org.apache.flink.api.common.serialization.DeserializationSchema;
 import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.api.connector.sink2.SinkWriter;
+import org.apache.flink.connector.elasticsearch.compatiable.JsonDeserializationSchema;
 import org.apache.flink.connector.elasticsearch.sink.ElasticsearchEmitter;
 import org.apache.flink.connector.elasticsearch.sink.RequestIndexer;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
+
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
+
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.data.StringData;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.SimpleUserCodeClassLoader;
 import org.apache.flink.util.UserCodeClassLoader;
@@ -38,6 +44,7 @@ import org.elasticsearch.common.xcontent.XContentType;
 
 import javax.annotation.Nullable;
 
+import java.io.IOException;
 import java.util.function.Function;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -47,6 +54,7 @@ class RowElasticsearchEmitter implements ElasticsearchEmitter<RowData> {
 
     private final IndexGenerator indexGenerator;
     private final SerializationSchema<RowData> serializationSchema;
+    private final DeserializationSchema<RowData> deserializationSchema;
     private final XContentType contentType;
     @Nullable private final String documentType;
     private final Function<RowData, String> createKey;
@@ -59,6 +67,7 @@ class RowElasticsearchEmitter implements ElasticsearchEmitter<RowData> {
             Function<RowData, String> createKey) {
         this.indexGenerator = checkNotNull(indexGenerator);
         this.serializationSchema = checkNotNull(serializationSchema);
+        this.deserializationSchema = new JsonDeserializationSchema(ObjectNode.class);
         this.contentType = checkNotNull(contentType);
         this.documentType = documentType;
         this.createKey = checkNotNull(createKey);
@@ -90,6 +99,7 @@ class RowElasticsearchEmitter implements ElasticsearchEmitter<RowData> {
     public void emit(RowData element, SinkWriter.Context context, RequestIndexer indexer) {
         switch (element.getRowKind()) {
             case INSERT:
+                processInsert(element, indexer);
             case UPDATE_AFTER:
                 processUpsert(element, indexer);
                 break;
@@ -100,6 +110,19 @@ class RowElasticsearchEmitter implements ElasticsearchEmitter<RowData> {
             default:
                 throw new TableException("Unsupported message kind: " + element.getRowKind());
         }
+    }
+
+    private void processInsert(RowData row, RequestIndexer indexer) {
+        if (!row.isNullAt(0) && row.getArity() == 1) {
+            StringData stringData = row.getString(0);
+            try {
+                //序列化第一个字段
+                row = deserializationSchema.deserialize(stringData.toBytes());
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        processUpsert(row, indexer);
     }
 
     private void processUpsert(RowData row, RequestIndexer indexer) {

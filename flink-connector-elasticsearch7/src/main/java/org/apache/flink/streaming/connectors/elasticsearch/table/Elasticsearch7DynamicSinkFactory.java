@@ -32,10 +32,13 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.factories.DynamicTableSinkFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.factories.SerializationFormatFactory;
+import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.utils.TableSchemaUtils;
 import org.apache.flink.util.StringUtils;
 
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -82,6 +85,15 @@ public class Elasticsearch7DynamicSinkFactory implements DynamicTableSinkFactory
     @Override
     public DynamicTableSink createDynamicTableSink(Context context) {
         TableSchema tableSchema = context.getCatalogTable().getSchema();
+        //TODO 做es的TableSchema抽取 取第一个字段还原
+        Optional<DataType> dataType = tableSchema.getFieldDataType(0);
+        if (tableSchema.getFieldCount() == 1 && dataType.isPresent()) {
+            Optional<String> expression =  tableSchema.getFieldName(0);
+            String expr = expression.get();
+//            TableSchemaUtils.builderWithGivenColumns(new ArrayList<>());
+            System.out.println(dataType.get().getLogicalType());
+        }
+
         ElasticsearchValidationUtils.validatePrimaryKey(tableSchema);
 
         final FactoryUtil.TableFactoryHelper helper =

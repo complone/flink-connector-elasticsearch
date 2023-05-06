@@ -106,25 +106,15 @@ abstract class ElasticsearchDynamicSinkBaseITCase {
         ResolvedSchema schema =
                 new ResolvedSchema(
                         Arrays.asList(
-                                Column.physical("a", DataTypes.BIGINT().notNull()),
-                                Column.physical("b", DataTypes.TIME()),
-                                Column.physical("c", DataTypes.STRING().notNull()),
-                                Column.physical("d", DataTypes.FLOAT()),
-                                Column.physical("e", DataTypes.TINYINT().notNull()),
-                                Column.physical("f", DataTypes.DATE()),
-                                Column.physical("g", DataTypes.TIMESTAMP().notNull())),
+                                Column.physical("expression", DataTypes.STRING().notNull()),
+                                Column.physical("_index", DataTypes.INT().notNull())),
                         Collections.emptyList(),
-                        UniqueConstraint.primaryKey("name", Arrays.asList("a", "g")));
+                        null);
         GenericRowData rowData =
                 GenericRowData.of(
-                        1L,
-                        12345,
-                        StringData.fromString("ABCDE"),
-                        12.12f,
-                        (byte) 2,
-                        12345,
-                        TimestampData.fromLocalDateTime(
-                                LocalDateTime.parse("2012-12-12T12:12:12")));
+                        "\"bq_xdflx_1\" : [{\"name\": \"三国演义\", \"price\": 18.8}, {\"name\": \"水浒传\", \"price\": 19.9}], \"id\" : \"443434343434\"",
+                        11
+                        );
 
         String index = "writing-documents";
         ElasticsearchDynamicSinkFactoryBase sinkFactory = getDynamicSinkFactory();
